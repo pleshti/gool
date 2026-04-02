@@ -5,11 +5,13 @@ Provides a web interface and API endpoints for predictions.
 
 from flask import Flask, render_template, jsonify, request
 import json
-import osfrom dotenv import load_dotenv
-
-load_dotenv()from datetime import datetime
+import os
+from datetime import datetime
+from dotenv import load_dotenv
 from scrapers.predictz_scraper import PredictzScraper
 import threading
+
+load_dotenv()
 
 app = Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
