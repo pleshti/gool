@@ -6,4 +6,3 @@ webdriver-manager==4.0.1
 python-dotenv==1.0.0
 cloudscraper==1.2.71
 gunicorn==21.2.0
-lxml==4.9.3
