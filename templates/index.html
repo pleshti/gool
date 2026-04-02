@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Predictz Scraper - Today's Football Predictions</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⚽ Predictz Scraper</h1>
+            <p class="subtitle">Today's Football Predictions</p>
+        </header>
+
+        <main>
+            <!-- Control Panel -->
+            <section class="control-panel">
+                <div class="controls">
+                    <button id="scrapeBtn" class="btn btn-primary">
+                        <span class="icon">🔄</span> Scrape Predictions
+                    </button>
+                    
+                    <div class="method-selector">
+                        <label for="method">Scraping Method:</label>
+                        <select id="method">
+                            <option value="requests">Fast (Requests)</option>
+                            <option value="selenium">Complete (Selenium)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="status-panel">
+                    <div class="status-item">
+                        <span class="label">Status:</span>
+                        <span id="status" class="status-badge ready">Ready</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="label">Last Scrape:</span>
+                        <span id="lastScrape" class="text">Never</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="label">Predictions Found:</span>
+                        <span id="predictionCount" class="counter">0</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Info Section -->
+            <section class="info-section">
+                <div class="info-box">
+                    <h3>ℹ️ About</h3>
+                    <p>This app scrapes today's football predictions from predictz.com and displays them in a clean, organized format.</p>
+                    <p><strong>Note:</strong> Use the "Complete (Selenium)" method for better accuracy on JavaScript-heavy pages.</p>
+                </div>
+            </section>
+
+            <!-- Predictions List -->
+            <section class="predictions-section">
+                <h2>Today's Predictions</h2>
+                <div id="loadingSpinner" class="loading hidden">
+                    <div class="spinner"></div>
+                    <p>Loading predictions...</p>
+                </div>
+                <div id="noPredictions" class="no-data">
+                    <p>📭 No predictions loaded yet. Click "Scrape Predictions" to start.</p>
+                </div>
+                <div id="predictionsList" class="predictions-grid"></div>
+            </section>
+
+            <!-- Raw JSON Section (Collapsible) -->
+            <section class="json-section">
+                <div class="json-header" onclick="toggleJson()">
+                    <h2>📋 Raw JSON Data</h2>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div id="jsonContent" class="json-content hidden">
+                    <textarea id="jsonData" readonly></textarea>
+                    <button class="btn btn-secondary" onclick="downloadJson()">
+                        📥 Download JSON
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Predictz Scraper v1.0 | Built with Flask & Python</p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
