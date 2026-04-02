@@ -32,7 +32,14 @@ wheels/
 .DS_Store
 
 # Project specific
+# Copied into cloud_function/ during deploy.ps1 / deploy.sh (do not commit)
+cloud_function/scrapers/
+cloud_function/firebase_service.py
+
 data/
 *.json
 .env
 .env.local
+
+# Local installers
+GoogleCloudSDKInstaller.exe

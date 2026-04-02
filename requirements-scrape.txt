@@ -1,0 +1,5 @@
+# Minimal deps for scheduled scraping (CI / GitHub Actions)
+requests==2.31.0
+beautifulsoup4==4.12.2
+cloudscraper==1.2.71
+firebase-admin==6.2.0

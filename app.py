@@ -10,8 +10,18 @@ from datetime import datetime
 from dotenv import load_dotenv
 from scrapers.predictz_scraper import PredictzScraper
 import threading
+import atexit
+from apscheduler.schedulers.background import BackgroundScheduler
 
 load_dotenv()
+
+# Firebase Realtime Database integration
+try:
+    from firebase_service import store_predictions, get_latest_predictions, get_prediction_history
+    FIREBASE_ENABLED = True
+except ImportError:
+    FIREBASE_ENABLED = False
+    print("[WARNING] Firebase service not available. Install firebase-admin to enable Realtime DB sync.")
 
 app = Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
@@ -47,10 +57,55 @@ def scrape_in_background(use_selenium=False):
         scraper.save_to_json('data/predictions.json')
         
         last_scrape_time = datetime.now().isoformat()
+        
+        # Sync to Firestore
+        if FIREBASE_ENABLED:
+            try:
+                data = get_predictions_from_file()
+                store_predictions(data)
+            except Exception as e:
+                print(f"[WARNING] Firestore sync failed (continuing anyway): {e}")
+        
         print("Scrape completed successfully")
     
     except Exception as e:
         print(f"Error during scraping: {e}")
+    
+    finally:
+        is_scraping = False
+
+
+def scheduled_scrape():
+    """Hourly scrape function triggered by APScheduler."""
+    global is_scraping, last_scrape_time, scraper
+    
+    if is_scraping:
+        print("[SCHEDULED] Scraping already in progress, skipping this cycle")
+        return
+    
+    try:
+        print(f"[SCHEDULED] Starting hourly scrape at {datetime.now().isoformat()}")
+        is_scraping = True
+        
+        scraper = PredictzScraper(use_selenium=False)
+        scraper.scrape()
+        scraper.save_to_json('data/predictions.json')
+        
+        last_scrape_time = datetime.now().isoformat()
+        
+        # Sync to Firebase Realtime Database
+        if FIREBASE_ENABLED:
+            try:
+                data = get_predictions_from_file()
+                store_predictions(data)
+                print("[SCHEDULED] Predictions synced to Firebase Realtime Database")
+            except Exception as e:
+                print(f"[SCHEDULED WARNING] Firebase sync failed: {e}")
+        
+        print(f"[SCHEDULED] Hourly scrape completed at {datetime.now().isoformat()}")
+    
+    except Exception as e:
+        print(f"[SCHEDULED ERROR] {e}")
     
     finally:
         is_scraping = False
@@ -120,6 +175,89 @@ def get_predictions_limit(limit):
     }), 200
 
 
+@app.route('/api/sync-realtime-db', methods=['POST'])
+def sync_realtime_db():
+    """Manually sync current JSON predictions to Realtime Database."""
+    if not FIREBASE_ENABLED:
+        return jsonify({'error': 'Firebase not configured'}), 503
+    
+    try:
+        data = get_predictions_from_file()
+        ref = store_predictions(data)
+        
+        if ref:
+            return jsonify({
+                'status': 'success',
+                'message': 'Data synced to Realtime Database',
+                'ref': ref,
+                'predictions_synced': data.get('total_predictions', 0)
+            }), 200
+        else:
+            return jsonify({'error': 'Failed to sync to Realtime Database'}), 500
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/realtime-db/latest', methods=['GET'])
+def get_realtime_db_latest():
+    """Get latest predictions from Realtime Database."""
+    if not FIREBASE_ENABLED:
+        return jsonify({'error': 'Firebase not configured'}), 503
+    
+    try:
+        result = get_latest_predictions()
+        
+        if result:
+            return jsonify({
+                'status': 'success',
+                'data': result
+            }), 200
+        else:
+            return jsonify({
+                'status': 'success',
+                'data': None,
+                'message': 'No predictions found in Realtime Database'
+            }), 200
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/realtime-db/history', methods=['GET'])
+def get_realtime_db_history():
+    """Get prediction history from Realtime Database."""
+    if not FIREBASE_ENABLED:
+        return jsonify({'error': 'Firebase not configured'}), 503
+    
+    try:
+        limit = request.args.get('limit', 10, type=int)
+        results = get_prediction_history(limit=limit)
+        
+        if results:
+            return jsonify({
+                'status': 'success',
+                'data': results,
+                'count': len(results)
+            }), 200
+        else:
+            return jsonify({
+                'status': 'success',
+                'data': [],
+                'count': 0,
+                'message': 'No prediction history found'
+            }), 200
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/sync-firestore', methods=['POST'])
+def sync_firestore():
+    """Manually sync current JSON predictions to Firestore (deprecated - use /api/sync-realtime-db)."""
+    return sync_realtime_db()
+
+
 @app.route('/api/match-details/<match_id>', methods=['GET'])
 def get_match_details(match_id):
     """Get detailed information for a specific match."""
@@ -146,6 +284,23 @@ def server_error(error):
 if __name__ == '__main__':
     # Create data directory if it doesn't exist
     os.makedirs('data', exist_ok=True)
+    
+    # Initialize APScheduler for hourly scraping
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(
+        func=scheduled_scrape,
+        trigger="cron",
+        hour='*',
+        minute=0,
+        id='hourly_scrape',
+        name='Hourly Predictz Scraper',
+        replace_existing=True
+    )
+    scheduler.start()
+    print("[INIT] APScheduler initialized - will scrape every hour at :00")
+    
+    # Register scheduler shutdown on app exit
+    atexit.register(lambda: scheduler.shutdown())
     
     # Run Flask app
     # Use 0.0.0.0 for deployment, 127.0.0.1 for local development

@@ -1,0 +1,1 @@
+# Predictz scraper package
